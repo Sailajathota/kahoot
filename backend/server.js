@@ -3,9 +3,35 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const { quizzes } = require('./quizData');
+const mongoose = require('mongoose');
+require('dotenv').config();
+
+const Quiz = require('./models/Quiz');
+
+let useDB = false;
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI)
+    .then(() => {
+      console.log('Connected to MongoDB');
+      useDB = true;
+    })
+    .catch(err => console.error('MongoDB connection error:', err));
+}
 
 const app = express();
 app.use(cors());
+app.use(express.json());
+
+app.post('/api/quizzes', async (req, res) => {
+  if (!useDB) return res.status(500).json({error: "Database not configured"});
+  try {
+    const quiz = new Quiz(req.body);
+    await quiz.save();
+    res.json(quiz);
+  } catch(e) {
+    res.status(400).json({error: e.message});
+  }
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -25,15 +51,44 @@ io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
   // Fetch quizzes
-  socket.on('get-quizzes', (callback) => {
-    if (typeof callback === 'function') {
+  socket.on('get-quizzes', async (callback) => {
+    if (typeof callback !== 'function') return;
+    if (useDB) {
+      try {
+        const dbQuizzes = await Quiz.find({}, 'title _id');
+        callback({ quizzes: dbQuizzes.map(q => ({ id: q._id.toString(), title: q.title })) });
+      } catch (e) {
+        callback({ error: "Failed to fetch from DB" });
+      }
+    } else {
       callback({ quizzes: quizzes.map(q => ({ id: q.id, title: q.title })) });
     }
   });
 
   // Host creates room
-  socket.on('create-room', ({ quizId }, callback) => {
-    const quiz = quizzes.find(q => q.id === quizId);
+  socket.on('create-room', async ({ quizId }, callback) => {
+    if (typeof callback !== 'function') return;
+    let quiz;
+    if (useDB) {
+      try {
+        const doc = await Quiz.findById(quizId);
+        if (doc) {
+          quiz = {
+            id: doc._id.toString(),
+            title: doc.title,
+            questions: doc.questions.map(q => ({
+              text: q.text,
+              options: q.options,
+              correctOption: q.correctOption,
+              timeLimit: q.timeLimit
+            }))
+          };
+        }
+      } catch(e) { console.error(e) }
+    } else {
+      quiz = quizzes.find(q => q.id === quizId);
+    }
+    
     if (!quiz) return callback({ error: "Quiz not found" });
 
     let pin = generatePIN();

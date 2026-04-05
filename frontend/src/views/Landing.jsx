@@ -61,9 +61,14 @@ export default function Landing() {
       
       <div style={{ marginTop: '2rem' }}>
         <p style={{ marginBottom: '1rem', color: 'rgba(255,255,255,0.8)' }}>Are you a teacher?</p>
-        <button onClick={() => navigate('/host')} className="btn btn-secondary">
-          Host a Quiz
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+          <button onClick={() => navigate('/host')} className="btn btn-secondary">
+            Host a Quiz
+          </button>
+          <button onClick={() => navigate('/create')} className="btn btn-primary" style={{ background: 'var(--shape-blue)' }}>
+            Create New Quiz
+          </button>
+        </div>
       </div>
     </div>
   );
