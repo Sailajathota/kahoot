@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const Quiz = require('./models/Quiz');
+const QuizResult = require('./models/QuizResult');
 
 let useDB = false;
 if (process.env.MONGODB_URI) {
@@ -28,6 +29,16 @@ app.post('/api/quizzes', async (req, res) => {
     const quiz = new Quiz(req.body);
     await quiz.save();
     res.json(quiz);
+  } catch(e) {
+    res.status(400).json({error: e.message});
+  }
+});
+
+app.get('/api/results', async (req, res) => {
+  if (!useDB) return res.json([]);
+  try {
+    const results = await QuizResult.find().sort({ date: -1 }).limit(50);
+    res.json(results);
   } catch(e) {
     res.status(400).json({error: e.message});
   }
@@ -194,6 +205,21 @@ io.on('connection', (socket) => {
         room.state = 'finished';
         const sortedPlayers = [...room.players].sort((a, b) => b.score - a.score);
         io.to(pin).emit('game-finished', { players: sortedPlayers });
+        
+        if (useDB && room.quiz.id && room.players.length > 0) {
+          try {
+            const isValidId = mongoose.Types.ObjectId.isValid(room.quiz.id);
+            if (isValidId) {
+               QuizResult.create({
+                 quizId: room.quiz.id,
+                 quizTitle: room.quiz.title,
+                 players: sortedPlayers.map(p => ({name: p.name, score: p.score}))
+               });
+            }
+          } catch (e) {
+             console.error("Failed to save results:", e);
+          }
+        }
       } else {
         room.state = 'question';
         room.answersThisRound = 0;

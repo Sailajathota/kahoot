@@ -69,6 +69,11 @@ export default function Landing() {
             Create New Quiz
           </button>
         </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+          <button onClick={() => navigate('/results')} className="btn" style={{ background: 'var(--shape-green)', color: 'white', width: '100%', maxWidth: '300px' }}>
+            View Past Results
+          </button>
+        </div>
       </div>
     </div>
   );
